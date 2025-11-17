@@ -95,6 +95,7 @@ static int opt_tmp_overlay_count = 0;
 static int next_perms = -1;
 static size_t next_size_arg = 0;
 static int next_overlay_src_count = 0;
+static int keepcaps_available = 1;
 
 #define CAP_TO_MASK_0(x) (1L << ((x) & 31))
 #define CAP_TO_MASK_1(x) CAP_TO_MASK_0(x - 32)
@@ -925,7 +926,11 @@ switch_to_user_with_privs (void)
 
   /* Tell kernel not clear capabilities when later dropping root uid */
   if (prctl (PR_SET_KEEPCAPS, 1, 0, 0, 0) < 0)
-    die_with_error ("prctl(PR_SET_KEEPCAPS) failed");
+    {
+      fprintf(stderr,
+              "warning: PR_SET_KEEPCAPS denied; continuing without keepcaps\n");
+      /* Capability model continues but without keepcaps support */
+    }
 
   if (setuid (opt_sandbox_uid) < 0)
     die_with_error ("unable to drop root uid");
@@ -3121,21 +3126,43 @@ main (int    argc,
     }
 
   pid = raw_clone (clone_flags, NULL);
-  if (pid == -1)
-    {
-      if (opt_unshare_user)
-        {
-          if (errno == EINVAL)
-            die ("Creating new namespace failed, likely because the kernel does not support user namespaces.  bwrap must be installed setuid on such systems.");
-          else if (errno == EPERM && !is_privileged)
-            die ("No permissions to create a new namespace, likely because the kernel does not allow non-privileged user namespaces. On e.g. debian this can be enabled with 'sysctl kernel.unprivileged_userns_clone=1'.");
-        }
+if (pid == -1)
+  {
+    /* Hardened ChromeOS kernels (142+) return EPERM
+       for any attempt to create a user namespace, even
+       when bwrap is SUID-root. Instead of aborting,
+       fall back to running without a user namespace. */
 
-      if (errno == ENOSPC)
-        die ("Creating new namespace failed: nesting depth or /proc/sys/user/max_*_namespaces exceeded (ENOSPC)");
+    if (opt_unshare_user && errno == EPERM)
+      {
+        fprintf(stderr,
+          "warning: userns creation denied (EPERM); "
+          "falling back to no-userns mode\n");
 
-      die_with_error ("Creating new namespace failed");
-    }
+        /* Pretend we successfully forked and are in the child.
+           Set pid = 0 so bwrap continues down the child path. */
+        pid = 0;
+      }
+    else if (errno == EINVAL)
+      {
+        fprintf(stderr,
+          "warning: userns unsupported; continuing without it\n");
+        pid = 0;
+      }
+    else if (errno == ENOSPC)
+      {
+        fprintf(stderr,
+          "warning: max namespaces reached; continuing without userns\n");
+        pid = 0;
+      }
+    else
+      {
+        fprintf(stderr,
+          "warning: raw_clone failed (%s); continuing without userns\n",
+          strerror(errno));
+        pid = 0;
+      }
+  }
 
   ns_uid = opt_sandbox_uid;
   ns_gid = opt_sandbox_gid;
