@@ -1619,57 +1619,58 @@ close_ops_fd (void)
     }
 }
 
-/* We need to resolve relative symlinks in the sandbox before we
-   chroot so that absolute symlinks are handled correctly. We also
-   need to do this after we've switched to the real uid so that
-   e.g. paths on fuse mounts work */
 static void
-resolve_symlinks_in_ops (void)
+resolve_symlinks_in_ops(void)
 {
-  SetupOp *op;
+    SetupOp *op;
 
-  for (op = ops; op != NULL; op = op->next)
+    for (op = ops; op != NULL; op = op->next)
     {
-      const char *old_source;
+        const char *old_source;
 
-      switch (op->type)
+        switch (op->type)
         {
-        case SETUP_RO_BIND_MOUNT:
-        case SETUP_DEV_BIND_MOUNT:
-        case SETUP_BIND_MOUNT:
-        case SETUP_OVERLAY_SRC:
-        case SETUP_OVERLAY_MOUNT:
-          old_source = op->source;
-          op->source = realpath (old_source, NULL);
-          if (op->source == NULL)
-            {
-              if (op->flags & ALLOW_NOTEXIST && errno == ENOENT)
-                op->source = old_source;
-              else
-                die_with_error("Can't find source path %s", old_source);
-            }
-          break;
+            case SETUP_RO_BIND_MOUNT:
+            case SETUP_DEV_BIND_MOUNT:
+            case SETUP_BIND_MOUNT:
+            case SETUP_OVERLAY_SRC:
+            case SETUP_OVERLAY_MOUNT:
+                old_source = op->source;
 
-        case SETUP_RO_OVERLAY_MOUNT:
-        case SETUP_TMP_OVERLAY_MOUNT:
-        case SETUP_MOUNT_PROC:
-        case SETUP_MOUNT_DEV:
-        case SETUP_MOUNT_TMPFS:
-        case SETUP_MOUNT_MQUEUE:
-        case SETUP_MAKE_DIR:
-        case SETUP_MAKE_FILE:
-        case SETUP_MAKE_BIND_FILE:
-        case SETUP_MAKE_RO_BIND_FILE:
-        case SETUP_MAKE_SYMLINK:
-        case SETUP_REMOUNT_RO_NO_RECURSIVE:
-        case SETUP_SET_HOSTNAME:
-        case SETUP_CHMOD:
-        default:
-          break;
+                op->source = realpath(old_source, NULL);
+
+                if (op->source == NULL)
+                {
+                    if (op->flags & ALLOW_NOTEXIST && errno == ENOENT)
+                    {
+                        op->source = old_source; /* preserve original path */
+                    }
+                    else
+                    {
+                        die_with_error("Can't find source path %s", old_source);
+                    }
+                }
+                break;
+
+            case SETUP_RO_OVERLAY_MOUNT:
+            case SETUP_TMP_OVERLAY_MOUNT:
+            case SETUP_MOUNT_PROC:
+            case SETUP_MOUNT_DEV:
+            case SETUP_MOUNT_TMPFS:
+            case SETUP_MOUNT_MQUEUE:
+            case SETUP_MAKE_DIR:
+            case SETUP_MAKE_FILE:
+            case SETUP_MAKE_BIND_FILE:
+            case SETUP_MAKE_RO_BIND_FILE:
+            case SETUP_MAKE_SYMLINK:
+            case SETUP_REMOUNT_RO_NO_RECURSIVE:
+            case SETUP_SET_HOSTNAME:
+            case SETUP_CHMOD:
+            default:
+                break;
         }
     }
 }
-
 
 static const char *
 resolve_string_offset (void    *buffer,
