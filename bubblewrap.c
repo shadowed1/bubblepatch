@@ -1393,22 +1393,32 @@ setup_newroot (bool unshare_pid,
             }
 
           static const char *const stdionodes[] = { "stdin", "stdout", "stderr" };
-          for (i = 0; i < N_ELEMENTS (stdionodes); i++)
-            {
-              cleanup_free char *target = xasprintf ("/proc/self/fd/%d", i);
-              cleanup_free char *node_dest = strconcat3 (dest, "/", stdionodes[i]);
-              if (symlink (target, node_dest) < 0)
-                die_with_error ("Can't create symlink %s/%s", op->dest, stdionodes[i]);
-            }
-
-          /* /dev/fd and /dev/core - legacy, but both nspawn and docker do these */
-          { cleanup_free char *dev_fd = strconcat (dest, "/fd");
-            if (symlink ("/proc/self/fd", dev_fd) < 0)
-              die_with_error ("Can't create symlink %s", dev_fd);
+          for (i = 0; i < N_ELEMENTS(stdionodes); i++)
+          {
+              cleanup_free char *target = xasprintf("/proc/self/fd/%d", i);
+              cleanup_free char *node_dest = strconcat3(dest, "/", stdionodes[i]);
+          
+              if (access(target, F_OK) == 0)
+              {
+                  if (symlink(target, node_dest) < 0)
+                      die_with_error("Can't create symlink %s/%s", op->dest, stdionodes[i]);
+              }
+              else
+              {
+                  log_debug("Skipping /proc/self/fd/%d: does not exist", i);
+              }
           }
-          { cleanup_free char *dev_core = strconcat (dest, "/core");
-            if (symlink ("/proc/kcore", dev_core) < 0)
-              die_with_error ("Can't create symlink %s", dev_core);
+          
+          {
+              cleanup_free char *dev_fd = strconcat(dest, "/fd");
+              if (symlink("/proc/self/fd", dev_fd) < 0)
+                  die_with_error("Can't create symlink %s", dev_fd);
+          }
+          
+          {
+              cleanup_free char *dev_core = strconcat(dest, "/core");
+              if (symlink("/proc/kcore", dev_core) < 0)
+                  die_with_error("Can't create symlink %s", dev_core);
           }
 
           {
