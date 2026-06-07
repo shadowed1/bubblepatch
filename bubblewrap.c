@@ -3145,15 +3145,18 @@ if (pid == -1)
        fall back to running without a user namespace. */
 
     if (opt_unshare_user && errno == EPERM)
-      {
-        fprintf(stderr,
-          "warning: userns creation denied (EPERM); "
-          "falling back to no-userns mode\n");
-
-        /* Pretend we successfully forked and are in the child.
-           Set pid = 0 so bwrap continues down the child path. */
-        pid = 0;
-      }
+    {
+      fprintf(stderr,
+        "warning: userns creation denied (EPERM); "
+        "falling back to no-userns mode\n");
+  
+      val = 1;
+      TEMP_FAILURE_RETRY (write (child_wait_fd, &val, 8));
+      close (child_wait_fd);
+      child_wait_fd = -1;
+  
+      pid = 0;
+    }
     else if (errno == EINVAL)
       {
         fprintf(stderr,
