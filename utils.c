@@ -69,7 +69,16 @@ bwrap_log (int severity,
 void
 die_with_error (const char *format, ...)
 {
-  return;
+  va_list args;
+  int errsv;
+
+  errsv = errno;
+
+  va_start (args, format);
+  bwrap_logv (LOG_ERR, format, args, strerror (errsv));
+  va_end (args);
+
+  exit (1);
 }
 
 void
