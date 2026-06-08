@@ -2915,6 +2915,7 @@ main (int    argc,
   if (argc == 2 && (strcmp (argv[1], "--version") == 0))
     print_version_and_exit ();
 
+  struct sigaction sa = {};
   sigemptyset (&sa.sa_mask);
   sa.sa_handler = SIG_DFL;
   sigaction (SIGCHLD, &sa, NULL);
