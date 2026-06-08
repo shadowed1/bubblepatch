@@ -2905,7 +2905,6 @@ main (int    argc,
   int intermediate_pids_sockets[2] = {-1, -1};
   const char *exec_path = NULL;
   int i;
-  struct sigaction sa = {};
 
   /* Handle --version early on before we try to acquire/drop
    * any capabilities so it works in a build environment;
@@ -2914,10 +2913,6 @@ main (int    argc,
    */
   if (argc == 2 && (strcmp (argv[1], "--version") == 0))
     print_version_and_exit ();
-  
-  sigemptyset (&sa.sa_mask);
-  sa.sa_handler = SIG_DFL;
-  sigaction (SIGCHLD, &sa, NULL);
 
   real_uid = getuid ();
   real_gid = getgid ();
@@ -3126,7 +3121,7 @@ main (int    argc,
     }
 
   /* Switch to the custom user ns before the clone, gets us privs in that ns (assuming its a child of the current and thus allowed) */
-  if (opt_userns_fd != -1 && setns (opt_userns_fd, CLONE_NEWUSER) != 0)
+  if (opt_userns_fd > 0 && setns (opt_userns_fd, CLONE_NEWUSER) != 0)
     {
       if (errno == EINVAL)
         die ("Joining the specified user namespace failed, it might not be a descendant of the current user namespace.");
@@ -3150,18 +3145,15 @@ if (pid == -1)
        fall back to running without a user namespace. */
 
     if (opt_unshare_user && errno == EPERM)
-    {
-      fprintf(stderr,
-        "warning: userns creation denied (EPERM); "
-        "falling back to no-userns mode\n");
-  
-      val = 1;
-      TEMP_FAILURE_RETRY (write (child_wait_fd, &val, 8));
-      close (child_wait_fd);
-      child_wait_fd = -1;
-  
-      pid = 0;
-    }
+      {
+        fprintf(stderr,
+          "warning: userns creation denied (EPERM); "
+          "falling back to no-userns mode\n");
+
+        /* Pretend we successfully forked and are in the child.
+           Set pid = 0 so bwrap continues down the child path. */
+        pid = 0;
+      }
     else if (errno == EINVAL)
       {
         fprintf(stderr,
@@ -3217,7 +3209,7 @@ if (pid == -1)
 
       /* Initial launched process, wait for pid 1 or exec:ed command to exit */
 
-      if (opt_userns2_fd != -1 && setns (opt_userns2_fd, CLONE_NEWUSER) != 0)
+      if (opt_userns2_fd > 0 && setns (opt_userns2_fd, CLONE_NEWUSER) != 0)
         die_with_error ("Setting userns2 failed");
 
       /* We don't need any privileges in the launcher, drop them immediately. */
@@ -3258,7 +3250,7 @@ if (pid == -1)
       return monitor_child (event_fd, pid, setup_finished_pipe[0]);
     }
 
-  if (opt_pidns_fd != -1)
+  if (opt_pidns_fd > 0)
     {
       if (setns (opt_pidns_fd, CLONE_NEWPID) != 0)
         die_with_error ("Setting pidns failed");
@@ -3485,7 +3477,7 @@ if (pid == -1)
       die_with_error ("chdir /");
   }
 
-  if (opt_userns2_fd != -1 && setns (opt_userns2_fd, CLONE_NEWUSER) != 0)
+  if (opt_userns2_fd > 0 && setns (opt_userns2_fd, CLONE_NEWUSER) != 0)
     die_with_error ("Setting userns2 failed");
 
   if (opt_unshare_user && opt_userns_block_fd == -1 &&
