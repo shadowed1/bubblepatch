@@ -95,7 +95,6 @@ static int opt_tmp_overlay_count = 0;
 static int next_perms = -1;
 static size_t next_size_arg = 0;
 static int next_overlay_src_count = 0;
-static int keepcaps_available = 1;
 
 #define CAP_TO_MASK_0(x) (1L << ((x) & 31))
 #define CAP_TO_MASK_1(x) CAP_TO_MASK_0(x - 32)
@@ -2915,10 +2914,12 @@ main (int    argc,
   if (argc == 2 && (strcmp (argv[1], "--version") == 0))
     print_version_and_exit ();
 
+  /* Reset SIGCHILD to SIG_DFL allowing signalfd working propertly
+   * if the parent process had set SIGCHLD to SIG_IGN. */
   sigemptyset (&sa.sa_mask);
   sa.sa_handler = SIG_DFL;
   sigaction (SIGCHLD, &sa, NULL);
-  
+
   real_uid = getuid ();
   real_gid = getgid ();
 
