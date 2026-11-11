@@ -1,0 +1,13 @@
+# bubblewrap release 0.13.0
+# adjust install location path
+# run inside chard proot or chroot 
+
+cd "$(mktemp -d)"
+curl -fsSLO https://github.com/containers/bubblewrap/releases/download/v0.13.0/bubblewrap-0.13.0.tar.xz
+tar -xf bubblewrap-0.13.0.tar.xz
+cd bubblewrap-0.13.0
+patch --batch --fuzz=0 -p1 < ~/bwrap-0.13.0.patch
+meson setup build -Dtests=true
+meson compile -C build
+meson test -C build --print-errorlogs
+./build/bwrap --version
